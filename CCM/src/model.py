@@ -103,10 +103,6 @@ class Model(object):
         for each in tf.trainable_variables():
             tf.summary.histogram(each.name, each)
         self.merged_summary_op = tf.summary.merge_all()
-        self.saver = tf.train.Saver(write_version=tf.train.SaverDef.V2, max_to_keep=3,
-                                    pad_step_number=True, keep_checkpoint_every_n_hours=1.0)
-        self.saver_epoch = tf.train.Saver(write_version=tf.train.SaverDef.V2, max_to_keep=1000,
-                                          pad_step_number=True)
 
     def _init_vocabs(self):
         self.symbol2index = MutableHashTable(key_dtype=tf.string, value_dtype=tf.int64,
@@ -182,10 +178,8 @@ class Model(object):
         decoder_input = tf.concat([response_word_input, triple_embed_input], axis=2)
         print("decoder_input:", decoder_input.shape)
 
-        # decoder layer1
-        decoder_cell1 = MultiRNNCell([GRUCell(self.num_units) for _ in range(self.num_layers)])
-        # decoder layer2
-        #decoder_cell2 = MultiRNNCell([GRUCell(self.num_units) for _ in range(self.num_layers)])
+        # define cell
+        decoder_cell = MultiRNNCell([GRUCell(self.num_units) for _ in range(self.num_layers)])
 
         # get loss functions
         sequence_loss, total_loss = loss_computation(self.vocab_size,
@@ -193,149 +187,75 @@ class Model(object):
 
         # decoder training process
         with tf.variable_scope('decoder'):
-            # layer 1: prepare attention
-            attention_states1 = encoder_output
-            attention_keys1, attention_values1, attention_score_fn1, attention_construct_fn1 \
-                = prepare_attention(attention_states1, 'bahdanau', self.num_units, scope_name="decoder_l1",
+            # prepare attention
+            attention_keys, attention_values, attention_score_fn, attention_construct_fn \
+                = prepare_attention(encoder_output, 'bahdanau', self.num_units, scope_name="decoder",
                                     imem=(self.graph_embedding, self.triples_embedding),
                                     output_alignments=self.output_alignments)
             print("graph_embedding:", self.graph_embedding.shape)
             print("triples_embedding:", self.triples_embedding.shape)
-            decoder_fn_train1 = attention_decoder_fn_train(encoder_state,
-                                                           attention_keys1,
-                                                           attention_values1,
-                                                           attention_score_fn1,
-                                                           attention_construct_fn1,
+            decoder_fn_train = attention_decoder_fn_train(encoder_state,
+                                                           attention_keys,
+                                                           attention_values,
+                                                           attention_score_fn,
+                                                           attention_construct_fn,
                                                            output_alignments=self.output_alignments,
                                                            max_length=tf.reduce_max(self.responses_length))
-            # layer 1: train decoder
-            decoder_output1, _, decoder_context_state1 = dynamic_rnn_decoder(decoder_cell1,
-                                                                             decoder_fn_train1,
-                                                                             decoder_input,
-                                                                             self.responses_length,
-                                                                             scope="decoder_rnn_l1")
-            output_fn1, selector_fn1 = output_projection(self.vocab_size,
-                                                         scope_name="decoder_rnn_l1")
-            output_logits1 = output_fn1(decoder_output1)
-            selector_logits1 = selector_fn1(decoder_output1)
-            print("decoder_output1:", decoder_output1.shape)  # shape: [batch, seq, num_units]
-            print("output_logits1:", output_logits1.shape)
-            print("selector_fn1:", selector_logits1.name)
+            # train decoder
+            decoder_output, _, decoder_context_state = dynamic_rnn_decoder(decoder_cell,
+                                                                            decoder_fn_train,
+                                                                            decoder_input,
+                                                                            self.responses_length,
+                                                                            scope="decoder_rnn")
+            output_fn, selector_fn = output_projection(self.vocab_size,
+                                                         scope_name="decoder_rnn")
+            output_logits = output_fn(decoder_output)
+            selector_logits = selector_fn(decoder_output)
+            print("decoder_output:", decoder_output.shape)  # shape: [batch, seq, num_units]
+            print("output_logits:", output_logits.shape)
+            print("selector_fn:", selector_logits.name)
 
             triple_len = tf.shape(self.triples)[2]
             one_hot_triples = tf.one_hot(self.match_triples, triple_len)
             use_triples = tf.reduce_sum(one_hot_triples, axis=[2, 3])
             alignments = tf.transpose(decoder_context_state1.stack(), perm=[1, 0, 2, 3])
-            self.decoder_loss1, self.ppx_loss1, self.sentence_ppx1 \
-                = total_loss(output_logits1,
-                             selector_logits1,
+            self.decoder_loss, self.ppx_loss, self.sentence_ppx \
+                = total_loss(output_logits,
+                             selector_logits,
                              self.responses_target,
                              self.decoder_mask,
                              alignments,
                              use_triples,
                              one_hot_triples)
-            '''
-            # layer 2: prepare attention
-            attention_states2 = (encoder_output, output_logits1)
-
-            attention_keys2, attention_values2, attention_score_fn2, attention_construct_fn2 \
-                = prepare_attention(attention_states2, 'bahdanau', self.num_units, scope_name="decoder_l2",
-                                    imem=(self.graph_embedding, self.triples_embedding),
-                                    output_alignments=self.output_alignments)
-            decoder_fn_train2 = attention_decoder_fn_train(encoder_state,
-                                                           attention_keys2,
-                                                           attention_values2,
-                                                           attention_score_fn2,
-                                                           attention_construct_fn2,
-                                                           output_alignments=self.output_alignments,
-                                                           max_length=tf.reduce_max(self.responses_length))
-            # layer 2: train decoder
-            decoder_output2, _, decoder_context_state2 = dynamic_rnn_decoder(decoder_cell2,
-                                                                     decoder_fn_train2,
-                                                                     decoder_input,
-                                                                     self.responses_length,
-                                                                     scope="decoder_rnn_l2")
-            output_fn2, selector_fn2 = output_projection(self.vocab_size,
-                                                         scope_name="decoder_rnn_l2")
-            output_logits2 = output_fn2(decoder_output2)
-            selector_logits2 = selector_fn2(decoder_output2)
-            print("decoder_output2:", decoder_output2.shape)  # shape: [batch, seq, num_units]
-            print("output_logits2:", output_logits2.shape)
-            print("selector_fn2:", selector_logits2.name)
-
-            triple_len = tf.shape(self.triples)[2]
-            one_hot_triples = tf.one_hot(self.match_triples, triple_len)
-            use_triples = tf.reduce_sum(one_hot_triples, axis=[2, 3])
-            alignments = tf.transpose(decoder_context_state2.stack(), perm=[1, 0, 2, 3])
-            self.decoder_loss2, self.ppx_loss2, self.sentence_ppx2 \
-                = total_loss(output_logits2,
-                             selector_logits2,
-                             self.responses_target,
-                             self.decoder_mask,
-                             alignments,
-                             use_triples,
-                             one_hot_triples)
-            '''
-            # compute total loss
-            self.decoder_loss = self.decoder_loss1
-            self.sentence_ppx = self.sentence_ppx1
             self.sentence_ppx = tf.identity(self.sentence_ppx, name="ppx_loss")
 
         # decoder inference process
         with tf.variable_scope('decoder', reuse=True):
-            # layer 1: prepare attention
-            attention_states1 = encoder_output
-            attention_keys1, attention_values1, attention_score_fn1, attention_construct_fn1 \
-                = prepare_attention(attention_states1, 'bahdanau', self.num_units, scope_name="decoder_l1",
+            # prepare attention
+            attention_keys, attention_values, attention_score_fn, attention_construct_fn \
+                = prepare_attention(encoder_output, 'bahdanau', self.num_units, scope_name="decoder",
                                     imem=(self.graph_embedding, self.triples_embedding),
                                     output_alignments=self.output_alignments,
                                     reuse=True)
-            output_fn1, selector_fn1 = output_projection(self.vocab_size,
+            output_fn, selector_fn = output_projection(self.vocab_size,
                                                          scope_name=None,
                                                          reuse=True)
-            decoder_fn_inference1 \
-                = attention_decoder_fn_inference(output_fn1, encoder_state,
-                                                 attention_keys1, attention_values1,
-                                                 attention_score_fn1, attention_construct_fn1,
+            decoder_fn_inference \
+                = attention_decoder_fn_inference(output_fn, encoder_state,
+                                                 attention_keys, attention_values,
+                                                 attention_score_fn, attention_construct_fn,
                                                  self.word_embed, GO_ID, EOS_ID, self.max_length, self.vocab_size,
                                                  imem=(self.entities_word_embedding,
                                                        tf.reshape(self.triples_embedding,
                                                                   [encoder_batch_size, -1, 3 * self.num_trans_units])),
-                                                 selector_fn=selector_fn1)
+                                                 selector_fn=selector_fn)
 
-            # layer 1: get decoder output
-            decoder_distribution1, _, infer_context_state1 \
-                = dynamic_rnn_decoder(decoder_cell1, decoder_fn_inference1, scope="decoder_rnn_l1")
+            # get decoder output
+            decoder_distribution, _, infer_context_state \
+                = dynamic_rnn_decoder(decoder_cell, decoder_fn_inference, scope="decoder_rnn")
             
-            '''
-            # layer 2: prepare attention
-            print("decoder_distribution1:", decoder_distribution1.shape)
-            attention_states2 = (encoder_output, decoder_distribution1)
-
-            attention_keys2, attention_values2, attention_score_fn2, attention_construct_fn2 \
-                = prepare_attention(attention_states2, 'bahdanau', self.num_units, scope_name="decoder_l2",
-                                    imem=(self.graph_embedding, self.triples_embedding),
-                                    output_alignments=self.output_alignments,
-                                    reuse=True)
-            output_fn2, selector_fn2 = output_projection(self.vocab_size,
-                                                         scope_name=None,
-                                                         reuse=True)
-            decoder_fn_inference2 \
-                = attention_decoder_fn_inference(output_fn2, encoder_state,
-                                                 attention_keys2, attention_values2,
-                                                 attention_score_fn2, attention_construct_fn2,
-                                                 self.word_embed, GO_ID, EOS_ID, self.max_length, self.vocab_size,
-                                                 imem=(self.entities_word_embedding,
-                                                       tf.reshape(self.triples_embedding,
-                                                                  [encoder_batch_size, -1, 3 * self.num_trans_units])),
-                                                 selector_fn=selector_fn2)
-            # layer 2: get decoder output
-            decoder_distribution2, _, infer_context_state2 \
-                = dynamic_rnn_decoder(decoder_cell2, decoder_fn_inference2, scope="decoder_rnn_l2")
-            print("decoder_distribution2:", decoder_distribution2.shape)
-            '''
-            output_len = tf.shape(decoder_distribution1)[1]
-            output_ids = tf.transpose(infer_context_state1.gather(tf.range(output_len)))
+            output_len = tf.shape(decoder_distribution)[1]
+            output_ids = tf.transpose(infer_context_state.gather(tf.range(output_len)))
             word_ids = tf.cast(tf.clip_by_value(output_ids, 0, self.vocab_size), tf.int64)
             entity_ids = tf.reshape(
                 tf.clip_by_value(-output_ids, 0, self.vocab_size) +
@@ -367,7 +287,7 @@ class Model(object):
 
     def print_parameters(self):
         for item in self.params:
-            print('%s: %s' % (item.name, item.get_shape()))
+            print('%s: %s' % (item.name, item.get_shape().as_list()))
     
     def step_train(self, session, data, forward_only=False, summary=False):
         input_feed = {self.posts: data['posts'],
