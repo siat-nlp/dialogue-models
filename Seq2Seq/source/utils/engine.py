@@ -107,13 +107,11 @@ def evaluate(model, data_iter, verbose=False):
     """
     model.eval()
     mm = MetricsManager()
-    ss = []
     with torch.no_grad():
         for inputs in data_iter:
-            metrics, scores = model.iterate(inputs=inputs, is_training=False)
+            metrics = model.iterate(inputs=inputs, is_training=False)
             mm.update(metrics)
-            ss.extend(scores.tolist())
-    return mm, ss
+    return mm
 
 
 class Trainer(object):
@@ -201,7 +199,7 @@ class Trainer(object):
             self.model.train()
             start_time = time.time()
             # Do a training iteration
-            metrics, _ = self.model.iterate(inputs,
+            metrics = self.model.iterate(inputs,
                                          optimizer=self.optimizer,
                                          grad_clip=self.grad_clip,
                                          is_training=True,
@@ -222,7 +220,7 @@ class Trainer(object):
 
             if batch_id % self.valid_steps == 0:
                 self.logger.info(self.valid_start_message)
-                valid_mm, _ = evaluate(self.model, self.valid_iter)
+                valid_mm = evaluate(self.model, self.valid_iter)
 
                 message_prefix = "[Valid][{:2d}][{}/{}]".format(self.epoch, batch_id, num_batches)
                 metrics_message = valid_mm.report_cum()
@@ -259,7 +257,7 @@ class Trainer(object):
         """
         train
         """
-        valid_mm, _ = evaluate(self.model, self.valid_iter)
+        valid_mm = evaluate(self.model, self.valid_iter)
         self.logger.info(valid_mm.report_cum())
         for _ in range(self.epoch, self.num_epochs):
             self.train_epoch()

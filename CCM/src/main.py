@@ -5,9 +5,9 @@ import random
 import json
 import numpy as np
 import tensorflow as tf
-import .utils as utils
+from .utils import load_data, load_knowledge, build_vocab
 from .model import Model
-from .trainer import model_train, model_evaluate, model_test
+from .trainer import model_train, model_evaluate, model_test, generate_summary
 
 random.seed(time.time())
 config = tf.ConfigProto()
@@ -26,7 +26,7 @@ tf.app.flags.DEFINE_integer("layers", 2, "Number of layers in the model")
 tf.app.flags.DEFINE_integer("batch_size", 100, "Batch size to use during training")
 tf.app.flags.DEFINE_integer("max_dec_lens", 60, "max tokens of decoder")
 tf.app.flags.DEFINE_float("lr", 0.0001, "learning rate for training")
-tf.app.flags.DEFINE_integer("per_checkpoint", 1000, "How many steps to do per checkpoint")
+tf.app.flags.DEFINE_integer("per_checkpoint", 100, "How many steps to do per checkpoint")
 tf.app.flags.DEFINE_integer("inference_version", 0, "The version for inferencing")
 tf.app.flags.DEFINE_boolean("log_parameters", True, "Set to True to show the parameters")
 FLAGS = tf.app.flags.FLAGS
@@ -39,15 +39,15 @@ def main():
         os.mkdir(FLAGS.train_dir)
     if FLAGS.is_train:
         # load data sets
-        data_train, data_dev, data_test = utils.load_data(FLAGS.data_dir, is_train=True)
-        print("origin data train: ", len(data_train))
+        data_train, data_dev, data_test = load_data(FLAGS.data_dir, is_train=True)
+        print("data train: ", len(data_train))
 
         # load KB & vocab
-        raw_vocab, KB_tuple = utils.load_knowledge(FLAGS.data_dir)
+        raw_vocab, KB_tuple = load_knowledge(FLAGS.data_dir)
 
         # build vocabs and knowledge graphs
         vocab, word_embed, entity_vocab, relation_vocab, \
-        entity_relation_embed = utils.build_vocab(FLAGS.data_dir, raw_vocab, FLAGS)
+        entity_relation_embed = build_vocab(FLAGS.data_dir, raw_vocab, FLAGS)
 
         FLAGS.num_entities = len(entity_vocab)
         FLAGS.num_relations = len(relation_vocab)
@@ -77,7 +77,6 @@ def main():
             loss_step = np.zeros((1,))
             ppx_step = np.zeros((1,))
             train_len = len(data_train)
-            print("Train data: ", train_len)
 
             while True:
                 st, ed = 0, FLAGS.batch_size*FLAGS.per_checkpoint
@@ -93,7 +92,7 @@ def main():
                         loss_step += decoder_loss / (ed - st)
 
                     show = lambda a: '[%s]' % (' '.join(['%.2f' % x for x in a]))
-                    print(" global step %d step-time %.2f loss %f ppx_loss %f perplexity %s"
+                    print("global step %d step-time %.2f loss %f ppx_loss %f perplexity %s"
                           % (model.global_step.eval(),
                              (time.time() - start_time) / ((ed - st) / FLAGS.batch_size), loss_step, ppx_step,
                              show(np.exp(ppx_step))))
@@ -115,9 +114,9 @@ def main():
                 saver_epoch.save(sess, '%s/epoch/checkpoint' % FLAGS.train_dir, global_step=model.global_step)
     else:
         # load test test
-        _, _, data_test = utils.load_data(FLAGS.data_dir, is_train=False)
+        _, _, data_test = load_data(FLAGS.data_dir, is_train=False)
         # load KB & vocab
-        raw_vocab, KB_tuple = utils.load_knowledge(FLAGS.data_dir)
+        raw_vocab, KB_tuple = load_knowledge(FLAGS.data_dir)
 
         model = Model(word_embed=None, entity_embed=None, vocab_size=FLAGS.vocab_size,
                       num_embed_units=FLAGS.embed_units, num_units=FLAGS.units, num_layers=FLAGS.layers,
@@ -131,7 +130,7 @@ def main():
                 model_path = tf.train.latest_checkpoint(FLAGS.train_dir)
             else:
                 model_path = '%s/checkpoint-%08d' % (FLAGS.train_dir, FLAGS.inference_version)
-            print('restore from %s' % model_path)
+            print("restore from %s" % model_path)
             saver.restore(sess, model_path)
 
             # test model on test set

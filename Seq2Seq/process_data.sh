@@ -50,3 +50,6 @@ do
     # step 2: convert sample data to text data required by the model
     ${pythonpath} ./tools/convert_conversation_corpus_to_model_text.py ${sample_file} ${text_file} ${topic_file} ${TOPIC_GENERALIZATION}
 done
+
+# step 3: in train stage, we just use train.txt and dev.txt, so we copy dev.txt to test.txt for model training
+cp ${datapath}/${prefix}.dev ${datapath}/${prefix}.test

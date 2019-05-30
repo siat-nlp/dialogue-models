@@ -1,11 +1,15 @@
+import random
+import json
+import os
 import tensorflow as tf
 import numpy as np
 from nltk.translate.bleu_score import corpus_bleu
-import .utils as utils
+from .utils import gen_batched_data
+FLAGS = tf.app.flags.FLAGS
 
 
 def model_train(model, sess, data_train, KB_tuple):
-    batched_data = utils.gen_batched_data(data_train, KB_tuple, FLAGS)
+    batched_data = gen_batched_data(data_train, KB_tuple, FLAGS)
     outputs = model.step_train(sess, batched_data)
     sentence_ppx = np.sum(outputs[0])
     decoder_loss = np.sum(outputs[1])
@@ -14,7 +18,7 @@ def model_train(model, sess, data_train, KB_tuple):
 
 def generate_summary(model, sess, data_train, KB_tuple):
     selected_data = [random.choice(data_train) for i in range(FLAGS.batch_size)]
-    batched_data = utils.gen_batched_data(selected_data, KB_tuple, FLAGS)
+    batched_data = gen_batched_data(selected_data, KB_tuple, FLAGS)
     outputs = model.step_train(sess, batched_data, forward_only=True, summary=True)
     summary = outputs[-1]
     return summary
@@ -25,7 +29,7 @@ def model_evaluate(model, sess, data_dev, summary_writer, KB_tuple):
     st, ed, times = 0, FLAGS.batch_size, 0
     while st < len(data_dev):
         selected_data = data_dev[st:ed]
-        batched_data = utils.gen_batched_data(selected_data, KB_tuple, FLAGS)
+        batched_data = gen_batched_data(selected_data, KB_tuple, FLAGS)
         outputs = model.step_train(sess, batched_data, forward_only=True)
         ppx += np.sum(outputs[0])
         st, ed = ed, ed+FLAGS.batch_size
@@ -78,7 +82,7 @@ def model_test(sess, saver, data_dev, KB_tuple, setnum=5000, max_step=800000):
             loss = []
             while st < len(data_dev):
                 selected_data = data_dev[st:ed]
-                batched_data = utils.gen_batched_data(selected_data, KB_tuple, FLAGS)
+                batched_data = gen_batched_data(selected_data, KB_tuple, FLAGS)
                 responses, ppx_loss = sess.run(['decoder_1/generation:0', 'decoder/ppx_loss:0'],
                                                {'enc_inps:0': batched_data['posts'],
                                                 'enc_lens:0': batched_data['posts_length'],
@@ -89,6 +93,7 @@ def model_test(sess, saver, data_dev, KB_tuple, setnum=5000, max_step=800000):
                                                 'match_triples:0': batched_data['match_triples'],
                                                 'enc_triples:0': batched_data['posts_triple'],
                                                 'dec_triples:0': batched_data['responses_triple']})
+                
                 loss += [x for x in ppx_loss]
                 for response in responses:
                     result = []
@@ -100,6 +105,7 @@ def model_test(sess, saver, data_dev, KB_tuple, setnum=5000, max_step=800000):
                             break
                     results.append(result)
                 st, ed = ed, ed+FLAGS.batch_size
+                print("decoding %d" % st)
             match_entity_sum = [.0] * 4
             cnt = 0
             posts = [data['post'] for data in data_dev]

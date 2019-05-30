@@ -12,7 +12,7 @@ export CUDA_VISIBLE_DEVICES=2
 TOPIC_GENERALIZATION=1
 
 # set python path according to your actual environment
-pythonpath='python'
+pythonpath='python3'
 
 # the prefix of the file name used by the model, must be consistent with the configuration in network.py
 prefix=lic

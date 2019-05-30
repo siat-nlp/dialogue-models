@@ -62,14 +62,6 @@ def model_config():
     train_arg.add_argument("--lr_decay", type=float, default=0.5)
     train_arg.add_argument("--patience", type=int, default=3)
     train_arg.add_argument("--use_embed", type=str2bool, default=True)
-    train_arg.add_argument("--use_bow", type=str2bool, default=True)
-    train_arg.add_argument("--use_dssm", type=str2bool, default=False)  # use binary classifier
-    train_arg.add_argument("--use_pg", type=str2bool, default=False)  # use policy gradient
-    train_arg.add_argument("--use_gs", type=str2bool, default=False)  # use Gumbel softmax
-    train_arg.add_argument("--use_kd", type=str2bool, default=True)  # use knowledge dropout
-    train_arg.add_argument("--weight_control", type=str2bool, default=True)
-    train_arg.add_argument("--decode_concat", type=str2bool, default=True)
-    train_arg.add_argument("--use_posterior", type=str2bool, default=True)  # if testing, set False
 
     # Geneation
     gen_arg = parser.add_argument_group("Generation")
@@ -145,7 +137,7 @@ def main():
         print(model)
         model.load(config.ckpt)
         print("Testing ...")
-        metrics, scores = evaluate(model, test_iter)
+        metrics = evaluate(model, test_iter)
         print(metrics.report_cum())
         print("Generating ...")
         evaluate_generation(generator, test_iter, save_file=config.gen_file, verbos=True)

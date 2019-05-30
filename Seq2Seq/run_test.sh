@@ -12,7 +12,7 @@ export CUDA_VISIBLE_DEVICES=2
 TOPIC_GENERALIZATION=1
 
 # set python path according to your actual environment
-pythonpath='python'
+pythonpath='python3'
 
 # the prefix of the file name used by the model, must be consistent with the configuration in network.py
 prefix=lic
@@ -60,7 +60,7 @@ ${pythonpath} ./tools/convert_conversation_corpus_to_model_text.py ${sample_file
 ckpt_prefix=best.model
 mkdir -p ${output_dir}/${ckpt_prefix}
 
-${pythonpath} ./main.py --test --ckpt models/${ckpt_prefix} --gen_file ${output_dir}/${ckpt_prefix}/${datapart}.result --use_posterior False
+${pythonpath} ./main.py --test --ckpt models/${ckpt_prefix} --gen_file ${output_dir}/${ckpt_prefix}/${datapart}.result
 
 # step 4: replace slot mark generated during topic generalization with real text
 ${pythonpath} ./tools/topic_materialization.py ${output_dir}/${ckpt_prefix}/${datapart}.result ${output_dir}/${ckpt_prefix}/${datapart}.result.final ${topic_file}

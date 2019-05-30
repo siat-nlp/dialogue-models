@@ -27,7 +27,7 @@ def load_data(path, is_train=True):
     if is_train:
         with open('%s/trainset.txt' % path) as f:
             for idx, line in enumerate(f):
-                if idx % 100000 == 0:
+                if idx > 0 and idx % 100000 == 0:
                     print('read train file line %d' % idx)
                 data_train.append(json.loads(line))
         with open('%s/validset.txt' % path) as f:
@@ -64,8 +64,6 @@ def build_vocab(path, raw_vocab, FLAGS, trans='transE'):
     vectors = {}
     with open('%s/glove.840B.300d.txt' % path) as f:
         for i, line in enumerate(f):
-            if i % 100000 == 0:
-                print("    processing line %d" % i)
             s = line.strip()
             word = s[:s.find(' ')]
             vector = s[s.find(' ')+1:]

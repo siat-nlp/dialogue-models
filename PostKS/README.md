@@ -29,7 +29,7 @@ Put the data provided by the organizer under the data folder and rename them  tr
 
 Process the data with the following commands:
 ```
-sh process_data.sh
+bash process_data.sh
 ```
 
 ### Step 2: Train the model
@@ -37,7 +37,7 @@ sh process_data.sh
 Train model with the following commands:
 
 ```
-sh run_train.sh
+bash run_train.sh
 ```
 
 ### Step 3: Test the model
@@ -45,7 +45,7 @@ sh run_train.sh
 Test model with the following commands:
 
 ```
-sh run_test.sh
+bash run_test.sh
 ```
 
 ## References

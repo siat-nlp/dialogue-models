@@ -23,3 +23,6 @@ do
     # step 2: convert sample data to text data required by the model
     ${pythonpath} ./src/scripts/convert_sample_to_json.py ${sample_file} ${text_file} ${vocab_file}
 done
+
+# step 3: in train stage, we just use train.txt and dev.txt, so we copy dev.txt to test.txt for model training
+cp ${datapath}/json.dev.txt ${datapath}/json.test.txt

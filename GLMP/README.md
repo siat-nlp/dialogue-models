@@ -28,7 +28,7 @@ Put the data provided by the organizer under the data folder and rename them  tr
 
 Process the data with the following commands:
 ```
-sh process_data.sh
+bash process_data.sh
 ```
 
 ### Step 2: Train the model

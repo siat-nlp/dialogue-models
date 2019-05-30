@@ -218,7 +218,7 @@ class Model(object):
             triple_len = tf.shape(self.triples)[2]
             one_hot_triples = tf.one_hot(self.match_triples, triple_len)
             use_triples = tf.reduce_sum(one_hot_triples, axis=[2, 3])
-            alignments = tf.transpose(decoder_context_state1.stack(), perm=[1, 0, 2, 3])
+            alignments = tf.transpose(decoder_context_state.stack(), perm=[1, 0, 2, 3])
             self.decoder_loss, self.ppx_loss, self.sentence_ppx \
                 = total_loss(output_logits,
                              selector_logits,
