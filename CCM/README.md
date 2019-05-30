@@ -12,11 +12,19 @@ This is a tensorflow implementation of the model **CCM** [[Commonsense Knowledge
 
 ## Dataset
 
-To be updated ...
+The commonsense conversation dataset can be downloaded from [here](http://coai.cs.tsinghua.edu.cn/file/commonsense_conversation_dataset.tar.gz), which are put under the folder ```./data```.
 
 ## Quickstart
 
-To be updated ...
+* Train the model
+  ```
+  sh run_train.sh
+  ```
+* Test the model
+  ```
+  sh run_test.sh
+  ```
+
 
 ## References
 
