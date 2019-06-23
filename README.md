@@ -1,4 +1,4 @@
-Dialogue-baselines
+Dialogue-models
 =============================
 
 This repository contains reconstructed codes for some dialogue models.
